@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>pH Colour Lab — Teacher Vi</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<style>
+:root{--ink:#17324d;--glass:rgba(255,255,255,.88);--cyan:#79f0e3;--pink:#ff86b7;--gold:#ffd56a}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Inter,ui-rounded,system-ui,sans-serif;color:var(--ink);background:#101d36;overflow:hidden}
+#stage{position:fixed;inset:0;background:radial-gradient(ellipse at 50% 10%,#365b7d,#14213d 70%);overflow:hidden}
+#webcam{position:absolute;width:100%;height:100%;inset:0;object-fit:cover;transform:scaleX(-1);display:none}
+#fallback{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:white;padding:24px;background:radial-gradient(circle at 50% 20%,#426d8e,#17213c 70%)}
+#fallback .orb{font-size:clamp(4rem,12vw,9rem);filter:drop-shadow(0 15px 20px #0005)}
+#tint{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,#0b173b44,#101b3344 60%,#101b3388)}
+header{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;color:white;z-index:4}
+.brand{display:flex;gap:10px;align-items:center;font-weight:900;letter-spacing:.02em}.brand .logo{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#7af0dc,#d8ff9c);color:#17324d;font-size:23px;box-shadow:0 6px 20px #0003}
+header .sub{font-size:12px;opacity:.8;font-weight:600} .tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+button,.pill{border:0;border-radius:14px;padding:11px 14px;font-weight:800;font-size:13px;cursor:pointer;box-shadow:0 4px 0 #10254030;transition:transform .15s,filter .15s}button:hover{filter:brightness(1.05);transform:translateY(-1px)}button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.primary{background:linear-gradient(135deg,#b5fff0,#78e5dc);color:#17324d}.light{background:#ffffffeb;color:#17324d}.dark{background:#203d5a;color:white}.small{padding:9px 12px}
+main{position:absolute;inset:78px 18px 22px;display:grid;grid-template-columns:minmax(250px,320px) minmax(320px,1fr) minmax(240px,300px);gap:14px;z-index:2;pointer-events:none}
+.panel{background:var(--glass);backdrop-filter:blur(18px);border:1px solid #ffffffb0;border-radius:24px;padding:18px;box-shadow:0 18px 50px #07172b45;pointer-events:auto;min-height:0;overflow:auto}
+.eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.15em;font-weight:900;color:#4c7d91}.panel h2{margin:5px 0 8px;font-size:21px;line-height:1.12}.panel p{font-size:13px;line-height:1.5;margin:8px 0;color:#3c5870}
+.stage-list{display:grid;gap:8px;margin:15px 0}.stage-step{display:flex;align-items:center;gap:10px;border:1px solid #d8e5ec;border-radius:14px;padding:10px;background:#ffffff80;font-size:12px;font-weight:800}.stage-step .n{width:30px;height:30px;border-radius:10px;background:#e7f0f6;display:grid;place-items:center}.stage-step.active{border-color:#45cdbd;background:#e0fff7}.stage-step.active .n{background:#1e9e99;color:white}.stage-step.done{background:#f1ffdf}
+.progress{height:7px;background:#d9e5ec;border-radius:9px;overflow:hidden}.progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#51d9c8,#b4e86a);transition:width .3s}
+.mission{margin-top:14px;padding:13px;border-radius:17px;background:#173a55;color:white}.mission b{display:block;font-size:11px;color:#9af5e5;letter-spacing:.08em;text-transform:uppercase}.mission p{color:white;margin-bottom:0}
+#lab{display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;min-width:0;pointer-events:none}
+.lab-title{align-self:center;background:#ffffffdf;backdrop-filter:blur(12px);border-radius:18px;padding:10px 18px;text-align:center;box-shadow:0 10px 30px #07172b22;margin-bottom:10px;pointer-events:auto}.lab-title strong{display:block;font-size:17px}.lab-title span{font-size:11px;color:#55758a}
+.equipment{width:min(100%,720px);max-height:66vh;filter:drop-shadow(0 18px 25px #07172b30);overflow:visible;pointer-events:auto;touch-action:none}
+#rightPanel{display:flex;flex-direction:column;gap:12px}.hint{padding:13px 14px;border-radius:16px;background:#fff4c9;border:1px solid #f2d982;font-size:12px;line-height:1.45}.hint b{display:block;margin-bottom:4px}
+.sample-list{display:grid;gap:8px}.sample{border:2px solid #e0e9ee;border-radius:14px;padding:10px;background:white;display:flex;gap:10px;align-items:center;cursor:pointer;touch-action:manipulation}.sample:hover,.sample.selected{border-color:#43bfb2;background:#effffb}.sample .drop{width:32px;height:32px;border-radius:50% 50% 50% 8px;transform:rotate(-45deg);background:var(--c);border:2px solid #ffffff;box-shadow:0 0 0 1px #c5d5dc}.sample .txt{flex:1}.sample strong{display:block;font-size:12px}.sample small{font-size:10px;color:#6b8394}
+.feedback{padding:12px;border-radius:15px;background:#e9f5ff;font-size:12px;line-height:1.45;min-height:65px}.feedback.good{background:#e4ffec}.feedback.warn{background:#fff0e7}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.actions button{flex:1}
+#cursor{position:absolute;width:30px;height:30px;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 5px #52e7d466,0 4px 16px #0005;z-index:10;pointer-events:none;display:none;transform:translate(-50%,-50%)}#cursor.pinching{background:#ffd66a;border-color:#17324d;box-shadow:0 0 0 6px #ffd66a66}
+#toast{position:absolute;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;transition:.25s;z-index:12;background:#102c45;color:white;padding:12px 18px;border-radius:16px;font-size:13px;font-weight:800;max-width:90vw;text-align:center;pointer-events:none}#toast.show{opacity:1;transform:translate(-50%,0)}
+.modal{position:absolute;inset:0;z-index:20;background:#09152bbd;display:grid;place-items:center;padding:18px}.modal-card{max-width:560px;width:100%;background:#f8ffff;border-radius:26px;padding:26px;box-shadow:0 25px 80px #0007}.modal-card h1{font-size:clamp(25px,4vw,38px);margin:8px 0}.modal-card p,.modal-card li{font-size:14px;line-height:1.55}.modal-card .hero{font-size:44px}.modal-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.modal-actions button{flex:1}
+#question{display:none}.answer{display:block;width:100%;text-align:left;margin:8px 0;background:white;border:2px solid #dce8ee;box-shadow:none}
+#sortBins{display:none;gap:8px;grid-template-columns:repeat(3,1fr);width:min(100%,650px);pointer-events:auto;margin-top:10px}
+.bin{border:2px dashed #ffffffd9;border-radius:18px;background:#ffffffdb;min-height:70px;padding:10px;text-align:center;font-size:12px;font-weight:900;box-shadow:0 8px 20px #0002}
+.bin .binicon{font-size:22px;display:block}.bin.over{background:#baffec;border-color:#20a99c}
+#statusline{font-size:11px;color:#fff;text-shadow:0 1px 4px #0008;margin-top:8px;text-align:center}
+footer{position:absolute;bottom:7px;right:18px;z-index:4;color:#ffffffd9;font-size:10px;text-shadow:0 1px 4px #0008}
+@media(max-width:950px){main{grid-template-columns:240px minmax(240px,1fr);inset:76px 12px 16px;gap:10px}#rightPanel{grid-column:1 / -1;display:grid;grid-template-columns:1fr 1fr;max-height:220px}#rightPanel .sample-list{grid-column:1}#rightPanel .feedback{grid-column:2;grid-row:1 / span 2}#rightPanel .actions{grid-column:1 / -1} .equipment{max-height:46vh}}
+@media(max-width:620px){header{padding:8px 10px}.brand .sub{display:none}.brand .logo{width:34px;height:34px}header .tools button{padding:8px 10px;font-size:11px}main{inset:62px 8px 16px;grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:8px}.panel{padding:12px;border-radius:18px}.panel h2{font-size:17px}.panel p{font-size:11px}.left-panel{grid-column:1;grid-row:1}#lab{grid-column:2;grid-row:1 / span 2;justify-content:flex-start;padding-top:4px}.lab-title{padding:8px 10px;margin-bottom:6px}.lab-title strong{font-size:13px}.lab-title span{font-size:9px}.equipment{max-height:38vh;width:100%}#rightPanel{grid-column:1;grid-row:2;display:flex;max-height:none;gap:7px;padding:10px}.stage-list{gap:5px;margin:8px 0}.stage-step{padding:6px;font-size:10px;gap:6px}.stage-step .n{width:24px;height:24px}.mission{padding:9px;margin-top:8px}.mission p{font-size:10px}.sample{padding:7px}.sample .drop{width:22px;height:22px}.sample strong{font-size:10px}.sample small{font-size:9px}.hint{font-size:10px;padding:9px}.feedback{font-size:10px;min-height:45px;padding:8px}.actions button{font-size:10px;padding:8px}.tools{gap:4px}footer{right:8px;bottom:4px}#sortBins{grid-template-columns:1fr;position:absolute;bottom:5px;left:4px;width:42%;gap:4px} .bin{min-height:43px;padding:5px;font-size:10px}.binicon{font-size:15px!important}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <video id="webcam" playsinline muted></video>
+  <div id="fallback"><div><div class="orb">🧪</div><h2>Welcome to the Colour Lab</h2><p>Start your camera to enter the mixed-reality laboratory.</p></div></div>
+  <div id="tint"></div>
+  <header>
+    <div class="brand"><div class="logo">✦</div><div>PH COLOUR LAB<div class="sub">A mixed-reality science mission</div></div></div>
+    <div class="tools"><button class="primary" id="startBtn">START CAMERA</button><button class="light small" id="muteBtn">🔊 MUTE</button><button class="light small" id="resetBtn">↻ RESET</button></div>
+  </header>
+  <main>
+    <section class="panel left-panel">
+      <div class="eyebrow">SCIENCE MISSION • 01</div>
+      <h2>What is hiding in the colour?</h2>
+      <p>Use red-cabbage indicator to investigate three mystery samples. No tasting — scientists observe safely!</p>
+      <div class="progress"><span id="progressBar"></span></div>
+      <div class="stage-list">
+        <div class="stage-step active" data-stage="0"><span class="n">1</span><span>Predict</span></div>
+        <div class="stage-step" data-stage="1"><span class="n">2</span><span>Test the samples</span></div>
+        <div class="stage-step" data-stage="2"><span class="n">3</span><span>Sort the results</span></div>
+        <div class="stage-step" data-stage="3"><span class="n">4</span><span>Explain the colours</span></div>
+      </div>
+      <div class="mission"><b id="stageLabel">STAGE 1 · PREDICT</b><p id="missionText">Before testing, predict: which sample do you think is acidic?</p></div>
+      <div id="question">
+        <p><strong id="questionText">What does an indicator do?</strong></p>
+        <button class="answer" data-answer="a">It changes colour in different solutions.</button>
+        <button class="answer" data-answer="b">It makes every solution purple.</button>
+        <button class="answer" data-answer="c">It tells us the exact taste.</button>
+      </div>
+    </section>
+    <section id="lab">
+      <div class="lab-title"><strong>🧪 Virtual Bench</strong><span>Pinch and drag the dropper • or use your mouse</span></div>
+      <svg class="equipment" id="equipment" viewBox="0 0 700 510" role="img" aria-label="Virtual red cabbage indicator experiment">
+        <defs>
+          <linearGradient id="glass" x1="0" x2="1"><stop stop-color="#ffffff" stop-opacity=".9"/><stop offset=".5" stop-color="#bce7f4" stop-opacity=".45"/><stop offset="1" stop-color="#ffffff" stop-opacity=".8"/></linearGradient>
+          <linearGradient id="purpleLiquid" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#a88bf0"/><stop offset="1" stop-color="#7048c5"/></linearGradient>
+          <linearGradient id="acidLiquid" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffb3bd"/><stop offset="1" stop-color="#ed456b"/></linearGradient>
+          <linearGradient id="neutralLiquid" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#c4a6fa"/><stop offset="1" stop-color="#7852c9"/></linearGradient>
+          <linearGradient id="alkLiquid" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#79e8cb"/><stop offset="1" stop-color="#298fc2"/></linearGradient>
+          <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <!-- counter -->
+        <ellipse cx="350" cy="445" rx="300" ry="30" fill="#102d4d" opacity=".18"/>
+        <rect x="42" y="422" width="616" height="28" rx="14" fill="#ffffff" opacity=".72"/>
+        <rect x="57" y="444" width="586" height="13" rx="6" fill="#a9dbe4" opacity=".7"/>
+        <!-- indicator flask -->
+        <g id="indicatorFlask">
+          <path d="M132 120 L190 120 L190 170 L231 237 Q245 261 228 277 Q220 286 201 286 L102 286 Q83 286 75 277 Q58 261 73 237 L114 170 L114 120 Z" fill="url(#glass)" stroke="#f4ffff" stroke-width="5"/>
+          <path d="M92 246 Q150 236 215 246 L230 263 Q233 278 210 279 L98 279 Q72 277 79 260Z" fill="url(#purpleLiquid)" id="indicatorLiquid"/>
+          <path d="M111 177 L188 177" stroke="#fff" stroke-width="4" opacity=".8"/>
+          <path d="M118 130 L118 165 M128 130 L128 160" stroke="#fff" stroke-width="3" opacity=".65"/>
+          <text x="150" y="313" font-size="17" text-anchor="middle" font-weight="900" fill="#fff">INDICATOR</text>
+          <text x="150" y="332" font-size="12" text-anchor="middle" fill="#fff">Red cabbage • purple</text>
+        </g>
+        <!-- sample cups -->
+        <g class="sampleCup" data-sample="vinegar" transform="translate(285 225)" style="cursor:pointer">
+          <path d="M0 0 L78 0 L69 108 Q66 120 54 120 L24 120 Q12 120 9 108Z" fill="url(#glass)" stroke="#fff" stroke-width="4"/>
+          <path d="M8 57 L70 57 L65 106 Q63 112 52 112 L26 112 Q17 112 15 104Z" fill="#ffd0b0" opacity=".95"/>
+          <path d="M12 14 L20 100" stroke="#fff" stroke-width="3" opacity=".7"/>
+          <text x="39" y="144" text-anchor="middle" font-size="14" font-weight="900" fill="#fff">VINEGAR</text>
+          <text x="39" y="162" text-anchor="middle" font-size="11" fill="#fff">mystery A</text>
+        </g>
+        <g class="sampleCup" data-sample="water" transform="translate(408 225)" style="cursor:pointer">
+          <path d="M0 0 L78 0 L69 108 Q66 120 54 120 L24 120 Q12 120 9 108Z" fill="url(#glass)" stroke="#fff" stroke-width="4"/>
+          <path d="M8 57 L70 57 L65 106 Q63 112 52 112 L26 112 Q17 112 15 104Z" fill="#bceaff" opacity=".95"/>
+          <path d="M12 14 L20 100" stroke="#fff" stroke-width="3" opacity=".7"/>
+          <text x="39" y="144" text-anchor="middle" font-size="14" font-weight="900" fill="#fff">WATER</text>
+          <text x="39" y="162" text-anchor="middle" font-size="11" fill="#fff">mystery B</text>
+        </g>
+        <g class="sampleCup" data-sample="baking" transform="translate(531 225)" style="cursor:pointer">
+          <path d="M0 0 L78 0 L69 108 Q66 120 54 120 L24 120 Q12 120 9 108Z" fill="url(#glass)" stroke="#fff" stroke-width="4"/>
+          <path d="M8 57 L70 57 L65 106 Q63 112 52 112 L26 112 Q17 112 15 104Z" fill="#e9f5ff" opacity=".95"/>
+          <path d="M12 14 L20 100" stroke="#fff" stroke-width="3" opacity=".7"/>
+          <text x="39" y="144" text-anchor="middle" font-size="12" font-weight="900" fill="#fff">BAKING SODA</text>
+          <text x="39" y="162" text-anchor="middle" font-size="11" fill="#fff">mystery C</text>
+        </g>
+        <!-- dropper draggable -->
+        <g id="dropper" transform="translate(255 70) rotate(-25 45 60)" style="cursor:grab;touch-action:none">
+          <ellipse cx="45" cy="15" rx="17" ry="22" fill="#ff8db5" stroke="#fff" stroke-width="3"/>
+          <rect x="29" y="28" width="32" height="88" rx="13" fill="url(#glass)" stroke="#fff" stroke-width="3"/>
+          <path d="M34 70 L56 70 L56 105 Q45 115 34 105Z" fill="#7e6bd1" opacity=".9" id="dropperLiquid"/>
+          <path d="M37 38 L37 61" stroke="#fff" stroke-width="3" opacity=".8"/>
+          <path d="M40 116 L50 116 L45 139Z" fill="#d7f8ff" stroke="#fff" stroke-width="2"/>
+          <circle cx="45" cy="145" r="5" fill="#ffdc75" id="drop"/>
+          <text x="45" y="-15" text-anchor="middle" font-size="12" font-weight="900" fill="#fff">CLEAN DROPPER</text>
+        </g>
+        <g id="splash" opacity="0"><circle cx="150" cy="252" r="32" fill="#ff8fae" opacity=".25"/><circle cx="150" cy="252" r="18" fill="#ff8fae" opacity=".5"/></g>
+        <text x="350" y="485" text-anchor="middle" font-size="12" fill="#ffffff" opacity=".95">Virtual simulation • colours are approximate</text>
+      </svg>
+      <div id="sortBins">
+        <div class="bin" data-bin="acid"><span class="binicon">🍓</span>ACIDIC</div>
+        <div class="bin" data-bin="neutral"><span class="binicon">💧</span>NEAR NEUTRAL</div>
+        <div class="bin" data-bin="alkaline"><span class="binicon">🫧</span>ALKALINE</div>
+      </div>
+      <div id="statusline">Mouse/touch: drag the dropper to a sample, then to the indicator flask.</div>
+    </section>
+    <aside class="panel" id="rightPanel">
+      <div class="hint"><b>💡 LAB TIP</b><span id="hintText">A prediction is an idea to test, not a final answer. Use the colour evidence.</span></div>
+      <div class="eyebrow">MYSTERY SAMPLES</div>
+      <div class="sample-list">
+        <div class="sample" data-pick="vinegar" style="--c:#ff9a7c"><span class="drop"></span><div class="txt"><strong>Vinegar</strong><small>Sample A · household liquid</small></div></div>
+        <div class="sample" data-pick="water" style="--c:#80d9f5"><span class="drop"></span><div class="txt"><strong>Plain water</strong><small>Sample B · reference</small></div></div>
+        <div class="sample" data-pick="baking" style="--c:#e9f2ff"><span class="drop"></span><div class="txt"><strong>Baking-soda solution</strong><small>Sample C · dissolved powder</small></div></div>
+      </div>
+      <div class="feedback" id="feedback" aria-live="polite">Ready when you are! Start with a prediction.</div>
+      <div class="actions"><button class="primary" id="actionBtn">MAKE A PREDICTION</button><button class="light" id="helpBtn">HOW TO PLAY</button></div>
+    </aside>
+  </main>
+  <div id="cursor"></div><div id="toast"></div>
+  <footer>Created by Teacher Vi · Virtual lab only</footer>
+  <div class="modal" id="welcome">
+    <div class="modal-card">
+      <div class="hero">🧪🌈</div><div class="eyebrow">WELCOME, SCIENTIST</div>
+      <h1>pH Colour Lab</h1>
+      <p>Investigate vinegar, plain water and baking-soda solution with a virtual red-cabbage indicator. Make a prediction, test, sort and explain.</p>
+      <ul><li><b>Hand control:</b> point with your index finger. Pinch thumb and index finger to grab; move to drag; release to drop.</li><li><b>Mouse or touch:</b> click and drag the dropper, or tap a sample and use the lab controls.</li><li><b>Hover menu:</b> hold your cursor over a menu button for 0.8 seconds.</li><li><b>Camera:</b> use HTTPS or localhost and allow camera access. Camera access from file:// is not guaranteed.</li></ul>
+      <p><b>Safety:</b> This is a virtual experiment. Never taste laboratory samples. Colour changes are approximate and depend on concentration.</p>
+      <div class="modal-actions"><button class="primary" id="enterBtn">ENTER THE LAB</button><button class="light" id="modalCameraBtn">START CAMERA</button></div>
+    </div>
+  </div>
+  <div class="modal" id="errorModal" style="display:none">
+    <div class="modal-card"><div class="hero">📷</div><h1>Camera not available</h1><p id="errorText">Allow camera access and try again.</p><p><b>Bahasa Melayu:</b> Benarkan akses kamera pada pelayar. Gunakan laman HTTPS atau localhost. Semak kamera tidak digunakan oleh aplikasi lain, kemudian tekan Retry. Fail file:// tidak menjamin kamera berfungsi.</p><div class="modal-actions"><button class="primary" id="retryBtn">RETRY</button><button class="light" id="closeErrorBtn">USE MOUSE / TOUCH</button></div></div>
+  </div>
+</div>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const video=$('#webcam'), fallback=$('#fallback'), cursor=$('#cursor'), dropper=$('#dropper');
+const state={stage:0,prediction:null,tested:{},sorted:{},selected:null,dragging:false,muted:false,stream:null,handReady:false,hoverTarget:null,hoverSince:0,lastPinch:false,pinchHold:false,lastX:.5,lastY:.5,completed:false,answer:null};
+const samples={
+ vinegar:{name:'Vinegar',kind:'acid',colour:'#ee4c73',feedback:'Vinegar is acidic. The indicator turns red or pink in this simplified model.'},
+ water:{name:'Plain water',kind:'neutral',colour:'#8d70d5',feedback:'Plain water is near neutral. The indicator usually stays purple in this simplified model.'},
+ baking:{name:'Baking-soda solution',kind:'alkaline',colour:'#2eabc5',feedback:'Baking-soda solution is mildly alkaline. The indicator can shift toward blue or blue-green.'}
+};
+let audioCtx=null, hands=null, camera=null, pointer={x:0,y:0,active:false}, dragOffset={x:0,y:0}, startDropper={x:0,y:0}, currentTransform={x:255,y:70,angle:-25}, toastTimer=null;
+function sound(freq=660,duration=.08,type='sine'){if(state.muted)return;try{audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')audioCtx.resume();const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(.07,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+duration)}catch(e){}}
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2400)}
+function feedback(msg,type=''){const el=$('#feedback');el.textContent=msg;el.className='feedback '+type}
+function setStage(n){state.stage=Math.max(0,Math.min(3,n));$$('.stage-step').forEach((e,i)=>{e.classList.toggle('active',i===state.stage);e.classList.toggle('done',i<state.stage)});$('#progressBar').style.width=(state.stage/4*100)+'%';const labels=['STAGE 1 · PREDICT','STAGE 2 · TEST','STAGE 3 · SORT','STAGE 4 · EXPLAIN'];const missions=['Before testing, predict: which sample do you think is acidic? Choose a sample, then submit your prediction.','Use the clean dropper: collect one sample, then add it to the purple indicator. Test all three samples.','Drag each tested sample card into the matching classification bin. Use the colour evidence.','Explain why the indicator changes colour. Then answer the understanding question.'];$('#stageLabel').textContent=labels[state.stage];$('#missionText').textContent=missions[state.stage];$('#actionBtn').textContent=['MAKE A PREDICTION','TEST SELECTED SAMPLE','CHECK SORTING','CHECK UNDERSTANDING'][state.stage];$('#hintText').textContent=['A prediction is an idea to test, not a final answer. Use the colour evidence.','Drag the dropper to a sample cup, then move it to the indicator flask. Repeat for all three.','Acidic solutions tend toward red/pink; near-neutral stays purple; alkaline shifts blue/green.','The indicator pigment responds to the chemical conditions in a solution. Colours are approximate.'][state.stage];$('#question').style.display=state.stage===3?'block':'none';$('#sortBins').style.display=state.stage===2?'grid':'none';$('#progressBar').style.width=((state.stage+(state.completed?1:0))/4*100)+'%';updateSamples();renderDropper()}
+function updateSamples(){ $$('.sample[data-pick]').forEach(el=>{const id=el.dataset.pick;el.classList.toggle('selected',state.selected===id);const small=el.querySelector('small');small.textContent=state.tested[id]?`Tested · ${samples[id].kind==='acid'?'red/pink':samples[id].kind==='neutral'?'purple':'blue/green'}`:`Sample ${id==='vinegar'?'A':id==='water'?'B':'C'} · not tested`;});$$('.sampleCup').forEach(el=>{const id=el.dataset.sample;el.style.filter=state.tested[id]?'drop-shadow(0 0 10px '+samples[id].colour+')':'';el.style.opacity=state.stage===0?'.92':'1'});$$('.bin').forEach(b=>{const key=b.dataset.bin;const labels=Object.entries(state.sorted).filter(([id,k])=>k===key).map(([id])=>samples[id].name);b.querySelector('.binicon').textContent=key==='acid'?'🍓':key==='neutral'?'💧':'🫧';b.lastChild.textContent=' '+({acid:'ACIDIC',neutral:'NEAR NEUTRAL',alkaline:'ALKALINE'}[key])+(labels.length?' · '+labels.join(', '):'')})}
+function renderDropper(){dropper.setAttribute('transform',`translate(${currentTransform.x} ${currentTransform.y}) rotate(${currentTransform.angle} 45 60)`)}
+function svgPoint(clientX,clientY){const svg=$('#equipment'),r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal;const scale=Math.min(r.width/vb.width,r.height/vb.height);const ox=r.left+(r.width-vb.width*scale)/2,oy=r.top+(r.height-vb.height*scale)/2;return {x:(clientX-ox)/scale,y:(clientY-oy)/scale}}
+function screenPoint(svgx,svgy){const svg=$('#equipment'),r=svg.getBoundingClientRect(),vb=svg.viewBox.baseVal;const scale=Math.min(r.width/vb.width,r.height/vb.height);return {x:r.left+(r.width-vb.width*scale)/2+svgx*scale,y:r.top+(r.height-vb.height*scale)/2+svgy*scale}}
+function nearestSample(p){for(const el of $$('.sampleCup')){const b=el.getBBox(),tx=+el.getAttribute('transform').match(/translate\(([-\d.]+)\s+([-\d.]+)/).at(1),ty=+el.getAttribute('transform').match(/translate\(([-\d.]+)\s+([-\d.]+)/).at(2);if(p.x>=tx-15&&p.x<=tx+95&&p.y>=ty-15&&p.y<=ty+130)return el.dataset.sample}return null}
+function insideIndicator(p){return p.x>55&&p.x<255&&p.y>105&&p.y<300}
+function dropperMove(clientX,clientY){const p=svgPoint(clientX,clientY);currentTransform.x=p.x-45;currentTransform.y=p.y-60;renderDropper()}
+function applySample(id){if(!id)return;if(state.stage===0){state.selected=id;feedback(`You chose ${samples[id].name}. This is a prediction, not evidence yet. Press “Make a prediction” to record it.`);updateSamples();return}if(state.stage!==1){feedback('This is not the testing stage. Follow the current mission card.','warn');return}if(!state.selected){state.selected=id;feedback(`Selected ${samples[id].name}. Now drag the clean dropper onto the sample cup, then into the indicator flask.`);updateSamples();return}state.selected=id;updateSamples();feedback(`Selected ${samples[id].name}. Drag the dropper to this sample cup to collect a virtual drop.`)}
+function testSample(id){if(state.stage!==1){feedback('First make a prediction, then test samples in Stage 2.','warn');return}if(!id){feedback('Choose a sample card or drag the dropper to a sample cup.','warn');return}const s=samples[id];state.tested[id]=true;state.selected=id;$('#indicatorLiquid').setAttribute('fill',s.kind==='acid'?'url(#acidLiquid)':s.kind==='neutral'?'url(#neutralLiquid)':'url(#alkLiquid)');$('#indicatorLiquid').style.fill=s.colour;$('#dropperLiquid').style.fill=s.colour;$('#splash').setAttribute('opacity','.8');setTimeout(()=>$('#splash').setAttribute('opacity','0'),500);sound(s.kind==='acid'?520:s.kind==='neutral'?660:820,.15,'triangle');feedback(s.feedback,'good');toast(`${s.name} tested — colour observed!`);updateSamples();if(Object.keys(state.tested).length===3){$('#actionBtn').textContent='CONTINUE TO SORT';feedback('All three samples tested! Compare the observed colours, then continue to sorting.','good')}}
+function handleDrop(p){if(!state.dragging)return;const id=nearestSample(p);if(id){state.selected=id;if(state.stage===1){state._collected=id;$('#dropperLiquid').style.fill=samples[id].colour;feedback(`${samples[id].name} collected. Now drag the dropper into the indicator flask to observe the colour.`);sound(480)}else applySample(id);return}if(insideIndicator(p)){const id=state._collected||state.selected;if(id){testSample(id);state._collected=null}else feedback('Collect a sample first: drag the dropper to a sample cup, then to the indicator flask.','warn');return}if(state.stage===2){const bin=$$('.bin').find(b=>{const r=b.getBoundingClientRect();return pointer.x>=r.left&&pointer.x<=r.right&&pointer.y>=r.top&&pointer.y<=r.bottom});if(bin&&state.selected){sortSample(state.selected,bin.dataset.bin);return}}}
+function sortSample(id,bin){if(!state.tested[id]){feedback(`Test ${samples[id].name} first. Sorting needs observed evidence.`,'warn');return}const actual=samples[id].kind;if(actual!==bin){feedback(`Not quite. The ${samples[id].name} indicator became ${actual==='acid'?'red/pink':actual==='neutral'?'purple':'blue/green'}. Try the bin that matches that evidence.`,'warn');sound(220,.12,'square');return}state.sorted[id]=bin;feedback(`Correct: ${samples[id].name} is ${actual==='acid'?'acidic':actual==='neutral'?'near neutral':'alkaline'}. You used the colour evidence!`,'good');sound(800,.1);updateSamples();if(Object.keys(state.sorted).length===3){toast('All samples sorted correctly!');$('#actionBtn').textContent='CONTINUE TO EXPLAIN'}}
+function action(){sound(600);if(state.stage===0){if(!state.selected){feedback('Choose one sample as your prediction first.');return}state.prediction=state.selected;setStage(1);feedback(`Prediction recorded: you think ${samples[state.prediction].name} is acidic. Test the samples to check your idea.`,'good');return}if(state.stage===1){if(Object.keys(state.tested).length<3){feedback(`You have tested ${Object.keys(state.tested).length} of 3 samples. Test every sample before sorting.`,'warn');return}setStage(2);feedback('Now classify each tested sample. Choose a sample card, then click or drop it into a category bin.','good');return}if(state.stage===2){if(Object.keys(state.sorted).length<3){feedback(`You have correctly sorted ${Object.keys(state.sorted).length} of 3 samples. Check the colour evidence and try again.`,'warn');return}setStage(3);feedback('Great sorting! Explain what the indicator colour tells you, then answer the question.','good');return}if(state.stage===3){if(state.answer!=='a'){feedback('Try again: an indicator changes colour depending on whether a solution is acidic, near neutral or alkaline.','warn');return}state.completed=true;$('#progressBar').style.width='100%';feedback('Mission complete! Red cabbage indicator changes colour in different chemical conditions. Vinegar is acidic, plain water is near neutral, and baking-soda solution is alkaline. Colours are approximate.','good');$('#missionText').textContent='Mission complete! You used evidence to classify three samples.';$('#stageLabel').textContent='MISSION COMPLETE';$('#actionBtn').textContent='PLAY AGAIN';toast('Scientist badge earned!');return}if(state.completed)reset() }
+function reset(){state.stage=0;state.prediction=null;state.tested={};state.sorted={};state.selected=null;state._collected=null;state.completed=false;state.answer=null;$('#indicatorLiquid').style.fill='url(#purpleLiquid)';$('#indicatorLiquid').setAttribute('fill','url(#purpleLiquid)');$('#dropperLiquid').style.fill='#7e6bd1';$$('.answer').forEach(b=>b.style.borderColor='#dce8ee');currentTransform={x:255,y:70,angle:-25};renderDropper();setStage(0);feedback('Ready when you are! Start with a prediction.');toast('Lab reset. Start a new investigation.')}
+function pickAnswer(key){state.answer=key;$$('.answer').forEach(b=>b.style.borderColor=b.dataset.answer===key?'#36bcae':'#dce8ee');if(key==='a')feedback('Correct idea! Indicators change colour in different solutions. Press “Check understanding” to finish.','good');else feedback('Not quite. Think about what the colour change tells us about a solution.','warn')}
+$$('.sample[data-pick]').forEach(el=>el.addEventListener('click',()=>{const id=el.dataset.pick;state.selected=id;updateSamples();if(state.stage===2){feedback(`${samples[id].name} selected. Drag the dropper or choose the category bin that matches its observed colour.`);return}applySample(id)}));
+$$('.sampleCup').forEach(el=>el.addEventListener('click',()=>{const id=el.dataset.sample;if(state.stage===1){if(!state._collected){state._collected=id;state.selected=id;$('#dropperLiquid').style.fill=samples[id].colour;feedback(`${samples[id].name} collected. Now click the indicator flask to apply the drop.`);sound(450)}else testSample(id)}else applySample(id)}));
+$$('.bin').forEach(bin=>{bin.addEventListener('click',()=>{if(state.selected)sortSample(state.selected,bin.dataset.bin);else feedback('Select a tested sample card first, then choose a category.','warn')});bin.addEventListener('dragover',e=>{e.preventDefault();bin.classList.add('over')});bin.addEventListener('dragleave',()=>bin.classList.remove('over'));bin.addEventListener('drop',e=>{e.preventDefault();bin.classList.remove('over');if(state.selected)sortSample(state.selected,bin.dataset.bin)})});
+$$('.answer').forEach(b=>b.addEventListener('click',()=>pickAnswer(b.dataset.answer)));
+$('#actionBtn').addEventListener('click',()=>{if(state.completed){reset();return}action()});
+$('#resetBtn').addEventListener('click',reset);
+$('#muteBtn').addEventListener('click',()=>{state.muted=!state.muted;$('#muteBtn').textContent=state.muted?'🔇 SOUND OFF':'🔊 MUTE';if(!state.muted)sound()});
+$('#helpBtn').addEventListener('click',()=>toast('Index finger = cursor. Pinch thumb + index to grab. Move while pinching; release to drop. Mouse/touch also works.'));
+$('#enterBtn').addEventListener('click',()=>$('#welcome').style.display='none');
+$('#modalCameraBtn').addEventListener('click',async()=>{$('#welcome').style.display='none';await startCamera()});
+$('#startBtn').addEventListener('click',startCamera);
+$('#retryBtn').addEventListener('click',async()=>{ $('#errorModal').style.display='none';await startCamera()});
+$('#closeErrorBtn').addEventListener('click',()=>$('#errorModal').style.display='none');
+function showCameraError(err){$('#errorText').textContent=(err&&err.message?err.message+'. ':'')+'Check browser camera permission, select the correct camera, close other apps using it, and use HTTPS or localhost. Mouse/touch mode remains available.';$('#errorModal').style.display='grid';$('#startBtn').textContent='RETRY CAMERA'}
+async function startCamera(){try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('This browser does not provide camera access in this context.');const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:1280},height:{ideal:720}},audio:false});state.stream=stream;video.srcObject=stream;video.style.display='block';fallback.style.display='none';await video.play();$('#startBtn').textContent='CAMERA ON';$('#startBtn').disabled=true;if(window.Hands){hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});hands.setOptions({maxNumHands:1,modelComplexity:1,minDetectionConfidence:.6,minTrackingConfidence:.55});hands.onResults(onHands);camera=new Camera(video,{onFrame:async()=>{if(hands)await hands.send({image:video)}},width:1280,height:720});camera.start();$('#statusline').textContent='Hand tracking active: index finger points, pinch to grab and drag.'}else $('#statusline').textContent='Camera on. Use mouse/touch controls; hand tracking library did not load.';toast('Camera ready — let’s investigate!')}catch(err){showCameraError(err)}}
+function onHands(results){if(!results.multiHandLandmarks||!results.multiHandLandmarks.length){cursor.style.display='none';state.lastPinch=false;return}const lm=results.multiHandLandmarks[0],idx=lm[8],thumb=lm[4]; // mirrored display: camera feed is mirrored; map x to mirrored CSS position
+const x=1-idx.x,y=idx.y;state.lastX=x;state.lastY=y;const rect=$('#stage').getBoundingClientRect();const sx=x*rect.width,sy=y*rect.height;cursor.style.display='block';cursor.style.left=sx+'px';cursor.style.top=sy+'px';const d=Math.hypot(idx.x-thumb.x,idx.y-thumb.y);const pinch=state.pinchHold?d<.075:d<.052;cursor.classList.toggle('pinching',pinch);
+if(pinch&&!state.lastPinch){const el=document.elementFromPoint(sx,sy);if(el===dropper||dropper.contains(el)){state.dragging=true;const p=svgPoint(sx,sy);dragOffset={x:p.x-currentTransform.x,y:p.y-currentTransform.y};state.pinchHold=true;sound(420)}}
+if(pinch&&state.dragging){const p=svgPoint(sx,sy);currentTransform.x=p.x-dragOffset.x;currentTransform.y=p.y-dragOffset.y;renderDropper()}
+if(!pinch&&state.lastPinch&&state.dragging){state.dragging=false;state.pinchHold=false;const p=svgPoint(sx,sy);handleDrop(p);sound(330)}
+state.lastPinch=pinch;
+// 0.8s hover-to-confirm on action/menu controls; no accidental repeated activation
+const el=document.elementFromPoint(sx,sy);const target=el&&el.closest('button,.sample[data-pick],.bin,.answer');if(target&&!state.dragging){if(state.hoverTarget!==target){state.hoverTarget=target;state.hoverSince=performance.now()}else if(performance.now()-state.hoverSince>800){state.hoverSince=performance.now()+100000;target.click();toast('Hover confirmed')}}else{state.hoverTarget=null;state.hoverSince=0}
+}
+let mouseDown=false;
+dropper.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'||e.pointerType==='touch'||e.pointerType==='pen'){mouseDown=true;state.dragging=true;const p=svgPoint(e.clientX,e.clientY);dragOffset={x:p.x-currentTransform.x,y:p.y-currentTransform.y};dropper.setPointerCapture?.(e.pointerId);e.preventDefault()}});
+window.addEventListener('pointermove',e=>{pointer={x:e.clientX,y:e.clientY,active:true};if(mouseDown&&state.dragging){const p=svgPoint(e.clientX,e.clientY);currentTransform.x=p.x-dragOffset.x;currentTransform.y=p.y-dragOffset.y;renderDropper()}});
+window.addEventListener('pointerup',e=>{if(mouseDown&&state.dragging){mouseDown=false;state.dragging=false;handleDrop(svgPoint(e.clientX,e.clientY))}});
+$('#equipment').addEventListener('pointerup',e=>{if(!mouseDown&&!state.lastPinch){const p=svgPoint(e.clientX,e.clientY);if(insideIndicator(p)){if(state._collected)testSample(state._collected);else feedback('Choose a sample first, then apply it to the indicator.')}else{const id=nearestSample(p);if(id){if(state.stage===1&&!state._collected){state._collected=id;state.selected=id;$('#dropperLiquid').style.fill=samples[id].colour;feedback(`${samples[id].name} collected. Click the indicator flask to apply it.`)}else applySample(id)}}}});
+setStage(0);
+})();
+</script>
+</body>
+</html>
